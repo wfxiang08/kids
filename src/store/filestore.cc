@@ -42,6 +42,7 @@ bool FileStore::Open() {
   is_open_ = true;
   LogDebug("openning FileStore...");
   if (buffer_type_ == kSecondary) {
+    // 辅助和非辅助的区别
     secondary_file_ = File::Open(path_, name_, true, "kids.buffer", 0);
     if (secondary_file_ == NULL) {
       LogError(ERR_OPEN_FILE);
@@ -98,14 +99,23 @@ bool FileStore::DoAddMessage(const Message *msg) {
   bool success = false;
   if (buffer_type_ == kSecondary && secondary_file_ != NULL) {
     // secondary file store, write size and whole topic and msg
+    // 将消息序列化到本地磁盘(topic, content)
     success = secondary_file_->Write(msg->topic, sdslen(msg->topic), true, false)
         && secondary_file_->Write(msg->content, sdslen(msg->content), true, false);
   } else {
     // primary file store, write message to topic file
+    // 主要存储
+    // 1. 考虑消息的topic
+    //
     TopicFile::iterator it = topic_file_.find(msg->topic);
     if (it != topic_file_.end()) {
+        // 找到topic对应的File进行输出, 一个消息占据一行，不再处理Topic
       success = it->second->Write(msg->content, sdslen(msg->content), false, true);
     } else {
+        // 对应topic的文件不存在，如何处理呢?
+
+        // 时间对齐?
+        // 例如: 按照天来处理，如何办?
       time_t t = unixtime;
       if (rotate_interval_ > 0) t -= t % rotate_interval_;
       File *file = File::Open(path_, name_, false, msg->topic, t);

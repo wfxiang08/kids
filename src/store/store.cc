@@ -7,6 +7,7 @@
 #include "prioritystore.h"
 
 Store *Store::Create(StoreConfig *conf, struct Statistic *stat, aeEventLoop *el) {
+  // Store的选型
   Store *store = NULL;
   if (conf->type == "multiple") {
     store = new MultipleStore(conf, stat, el);
@@ -37,6 +38,8 @@ Store::Store(StoreConfig *conf) : topic_(conf->topic) {
 bool Store::PreAddMessage(const Message *msg) {
   LogDebug("topic verify %s %s", topic_.c_str(), msg->topic);
   if (topic_.length() == 1 && topic_[0] == '*') return true;  // avoid string matching
+
+  // 将topic和消息的msg->topic进行比较, 不符合要求，则放弃
   if (!stringmatchlen(topic_.c_str(), topic_.length(), msg->topic, sdslen(msg->topic), kids->config_.ignore_case)) {
     LogDebug("topic mismatch: %s - %s", topic_.c_str(), msg->topic);
     return false;

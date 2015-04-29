@@ -33,10 +33,13 @@ void *signal_thread_function(void *arg) {
   int err, signo;
   sigset_t *mask = static_cast<sigset_t *>(arg);
   while (true) {
+    // 监听信号
     err = sigwait(mask, &signo);
     if (err != 0) {
       LogFatal("sigwait error: %s", strerror(err));
     }
+
+    // 结束信号
     switch (signo) {
       case SIGINT:
       case SIGTERM:
@@ -44,6 +47,8 @@ void *signal_thread_function(void *arg) {
         LogInfo("Received signal %s, stopping kids now...", strsignal(signo));
         kids->Stop();
         return NULL;
+
+      // 重新加载配置
       case SIGHUP:
         {
           ParseContext *ctx_reloaded = ParseConfigFile(config_file);
@@ -57,10 +62,14 @@ void *signal_thread_function(void *arg) {
           kids->ReloadStoreConfig(ctx->conf);
         }
         break;
+
+      // Rotate Logfile
       case SIGUSR1:
         LogInfo("Rotate logfile", strsignal(signo));
         RotateLogger();
         break;
+
+        // 其他的位置信号
       default:
         LogFatal("error signal mask");
     }
@@ -124,11 +133,13 @@ void WritePID(char *pidfile) {
   }
 }
 
+// 项目入口:
 int main(int argc, char **argv) {
   bool daemonize = false;
   char *pidfile = NULL;
   int opt;
 
+  // 解析参数:
   while ((opt = getopt_long(argc, argv, short_options, long_options, NULL)) > 0) {
     switch (opt) {
       case 'c':
@@ -182,6 +193,8 @@ int main(int argc, char **argv) {
   LogInfo("Server started, Kids version " VERSION);
 
   if (pidfile) WritePID(pidfile);
+
+  // 启动kids
   kids->Start();
 
 #ifdef HEAP_PROFILE

@@ -18,6 +18,7 @@ class Store {
   };
 
  public:
+  // 构造函数
   static Store *Create(StoreConfig *conf, struct Statistic *stat, aeEventLoop *el);
 
   explicit Store(StoreConfig *conf);

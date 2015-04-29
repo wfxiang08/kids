@@ -122,12 +122,15 @@ void DeleteOldestFile(const char *path) {
 std::string MakeName(std::string pattern, const struct tm& tm, std::string topic) {
   char buffer[100];
 
+  // 日期
   sprintf(buffer, "%04d-%02d-%02d", 1900 + tm.tm_year, tm.tm_mon + 1, tm.tm_mday);
   std::string date(buffer);
 
+  // 时间
   sprintf(buffer, "%02d-%02d-%02d", tm.tm_hour, tm.tm_min, tm.tm_sec);
   std::string time(buffer);
 
+  // Topic
   size_t pos = pattern.find("[date]");
   if (pos != std::string::npos) pattern = pattern.replace(pos, 6, date);
   pos = pattern.find("[time]");
@@ -138,6 +141,13 @@ std::string MakeName(std::string pattern, const struct tm& tm, std::string topic
   return pattern;
 }
 
+
+//store file {
+//    path /path/to/logs/[topic]/[date];
+//    name [time].log;
+//    rotate 1hour;
+// }
+
 File *File::Open(std::string path, std::string name, bool is_secondary, std::string topic, time_t ti) {
   time_t now = ti;
   struct tm tm;
@@ -146,7 +156,11 @@ File *File::Open(std::string path, std::string name, bool is_secondary, std::str
   localtime_r(&now, &tm);
 
   std::string pathname = path;
+
+  // 辅助文件(随便...)
   if (is_secondary) name = "[date]-[time].kidsbuffer";
+
+  // Primary如何控制呢?
   if (!is_secondary) pathname = MakeName(path, tm, topic);
   std::string filename = MakeName(name, tm, topic);
 

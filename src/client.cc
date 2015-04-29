@@ -7,6 +7,7 @@ void ReadRequest(aeEventLoop *el, int fd, void *privdata, int mask) {
   char buf[KIDS_IOBUF_LEN];
   int nread;
 
+  // 读取数据失败
   nread = read(fd, buf, KIDS_IOBUF_LEN);
   if (nread == -1) {
     if (errno != EAGAIN) {
@@ -34,6 +35,8 @@ void ReadRequest(aeEventLoop *el, int fd, void *privdata, int mask) {
   }
 
   c->last_active_ = unixtime;
+
+  // 来一点数据，就加一点数据
   c->ProcessRequestBuffer();
 }
 
@@ -87,6 +90,10 @@ void SendReply(aeEventLoop *el, int fd, void *privdata, int mask) {
 Client *Client::Create(const int fd, Worker *t) {
   Client *c = new Client(fd, t);
 
+  // Client  fd_ 和 eventL_ 关联
+  // Worker通过文件来控制fd？ 具体如何控制呢?
+  // ReadRequest 回调函数, Client作为参数
+  // 然后Client就被socket/ae等驱动了
   if (aeCreateFileEvent(t->eventl_, c->fd_, AE_READABLE, ReadRequest, c) == AE_ERR) {
     LogError("%s", strerror(errno));
     delete c;
@@ -98,6 +105,7 @@ Client *Client::Create(const int fd, Worker *t) {
 Client::Client(const int fd, Worker *t)
     : fd_(fd), rep_(CLIENT_REP_BUF_BYTES), last_cmd_("NULL"), worker_(t)
 {
+  // tcpNoDelay 有数据就处理
   anetNonBlock(NULL, fd);
   anetEnableTcpNoDelay(NULL, fd);
 
@@ -182,6 +190,9 @@ std::string Client::ToString() {
 void Client::ProcessRequestBuffer() {
   while (req_.size() > 0) {
     if (flags_ & CLIENT_CLOSE_AFTER_REPLY) break;
+
+    // 解析Command
+    // 有数据就读取出来
     if (!ParseRequestBuffer()) break;
 
     if (argv_.size() == 0 || ProcessCommand()) {
@@ -421,6 +432,7 @@ void Client::ResetArgumentVector() {
 }
 
 bool Client::ProcessCommand() {
+   // 如何处理各种Command呢?
   LogDebug("process command '%s' argc_: %d", argv_[0], argv_.size());
   LogDebug("client: %s", ToString().c_str());
 
@@ -470,6 +482,9 @@ void Client::ProcessLog() {
     worker_->stat_.msg_in++;
     worker_->stat_.msg_in_traffic += (sdslen(argv_[1]) + sdslen(argv_[2]));
 
+    // 解析得到参数，
+    // 4. Worker 线程解析命令，将日志放入全局队列
+    //    https://github.com/wfxiang08/kids/blob/master/doc/overview.zh_CN.md
     if (kids->PutMessage(argv_[1], argv_[2], worker_->worker_id_)) {
       Reply(REP_CONE, REP_CONE_SIZE);
     } else {

@@ -72,17 +72,23 @@ bool BufferStore::DoAddMessage(const Message *msg) {
   if (state_ == kToSecondary) LogDebug("state: kSecondary");
   if (state_ == kTransfering) LogDebug("state: kTransfering");
 
+  // 内部维持一个状态
   if (state_ == kToPrimary) {
+    // 如果Primary是Open的，则AddMessage就解决问题了
     if (!primary_->IsOpen() || !primary_->AddMessage(msg)) {
       LogInfo("Store to primary store faild, switch to secondary");
+
+      // 如果Primary不靠谱，则启动Secondary
       secondary_->Open();
       state_ = kToSecondary;
     }
   }
 
+  // 如果是secondary或者transfering
   if (state_ == kToSecondary || state_ == kTransfering) {
     LogDebug("store to secondary store");
     if (!secondary_->IsOpen()) secondary_->Open();
+
     if (!secondary_->AddMessage(msg)) {
       LogError("Drop message: %s", ERR_SEND_SECONDARY);
 

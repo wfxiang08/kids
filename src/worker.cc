@@ -57,8 +57,12 @@ Worker::Worker(const int worker_id, MQCursor *cursor, const int num_workers)
       LogFatal("create thread failed: create notification socketpair failed: %s", strerror(errno));
     }
 
+    // anet如何和sockets关联起来
     anetNonBlock(NULL, noti_socks[0]);
     anetNonBlock(NULL, noti_socks[1]);
+
+    // 启动多少个Workers呢?
+    // num_workers_ + 1个Worker分别做做什么用?
     if (i == num_workers_) {
       conn_wait_to_notify_ = 0;
       conn_notify_send_fd_ = noti_socks[0];
@@ -106,6 +110,7 @@ void Worker::PutNewConnection(const int sfd) {
   conn_queue_.push_back(sfd);
   pthread_mutex_unlock(&conn_queue_lock_);
 
+  // 通知
   conn_wait_to_notify_++;
   while (conn_wait_to_notify_ > 0) {
     if (write(conn_notify_send_fd_, "", 1) != 1) {
@@ -127,6 +132,8 @@ void Worker::GetNewConnection(const int fd) {
   conn_queue_.pop_front();
   pthread_mutex_unlock(&conn_queue_lock_);
 
+  // https://github.com/wfxiang08/kids/blob/master/doc/overview.zh_CN.md
+  // 创建一个新的Client
   Client *c = Client::Create(sfd, this);
   if (c == NULL) {
     LogError("create client failed");

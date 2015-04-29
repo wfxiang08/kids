@@ -56,6 +56,8 @@ Master::Master(const KidsConfig *conf)
 
   last_thread_ = -1;
   message_queue_ = MQOpen();
+
+  // 创建aeEvent
   eventl_ = aeCreateEventLoop(65535);
 
   tcpfd_ = -1;
@@ -63,6 +65,8 @@ Master::Master(const KidsConfig *conf)
 
   char error[1024];
   int backlog = 511;
+
+  // 启动tcp server
   if (config_.listen_port > 0) {
     if (config_.listen_host.empty()) {
       tcpfd_ = anetTcpServer(error, config_.listen_port, NULL, backlog);
@@ -74,6 +78,7 @@ Master::Master(const KidsConfig *conf)
     }
   }
 
+  // 启动linux socket
   if (!config_.listen_socket.empty()) {
     unlink(const_cast<char*>(config_.listen_socket.c_str()));
     unixfd_ = anetUnixServer(error, const_cast<char*>(config_.listen_socket.c_str()), 0666, backlog);
@@ -90,6 +95,7 @@ Master *Master::Create(const KidsConfig *conf) {
   }
   kids = k;
 
+  // TCP --> AcceptTcpHandler
   if (k->tcpfd_ > 0 && aeCreateFileEvent(k->eventl_, k->tcpfd_, AE_READABLE, AcceptTcpHandler, NULL) == AE_ERR) {
     LogError("oom when create file event");
   } else if (k->tcpfd_ > 0) {
@@ -139,6 +145,9 @@ Master::~Master() {
   MQClose(message_queue_);
 }
 
+// 双重限制
+// 限制最大的client数
+// 限制同一个Host上的最大Client数
 bool Master::ShouldAccept(const std::string &host) {
   if (config_.max_clients <= 0)
     return true;
@@ -159,9 +168,14 @@ void Master::RemoveClient(const std::string &host) {
   connected_clients_[host] -= 1;
 }
 
+// 将Connection交给不同的worker threads
 void Master::AssignNewConnection(const int fd) {
+    // 交给不同的 worker
   last_thread_ = (last_thread_ + 1) % config_.worker_threads;
   Worker *t = workers_[last_thread_];
+
+  // Master 线程将 fd 分配给 worker 线程，创建 client 对象
+  // https://github.com/wfxiang08/kids/blob/master/doc/overview.zh_CN.md
   t->PutNewConnection(fd);
 }
 
@@ -177,13 +191,22 @@ bool Master::PutMessage(const sds &topic, const sds &content, const int worker_i
     return false;
   }
 
+  // 1. 将消息加入全局队列
+  //   https://github.com/wfxiang08/kids/blob/master/doc/overview.zh_CN.md
   MQPush(message_queue_, topic, content);
 
+  // 通知Workers和Store?
+  // Worker有两种类型
+  // 1. 产生日志
+  // 2. 消费日志(被订阅的)
   for (auto it : workers_) {
     it->AddNotify(worker_id);
   }
+
+  // 通知 Storer
   storer_->AddNotify(worker_id);
 
+  // 通知新消息
   NotifyNewMessage(worker_id);
   return true;
 }
@@ -196,7 +219,10 @@ void Master::NotifyNewMessage(const int worker_id) {
 }
 
 void Master::Start() {
+  // 启动storer
   storer_->Start();
+
+  // 启动worker
   for (auto it : workers_) {
     it->Start();
   }
