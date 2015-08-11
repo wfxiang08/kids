@@ -4,12 +4,17 @@
 FileStore::FileStore(StoreConfig *conf, struct Statistic* stat) : Store(conf), stat_(stat) {
   is_open_ = false;
   secondary_file_ = NULL;
+
+  // 标准化: path
   path_ = conf->path;
   if (path_.back() != '/') {
     path_ = path_ + "/";
   }
   name_ = conf->name;
   LogDebug("rotate %s", conf->rotate.c_str());
+
+  // 1. rotate是如何实现的呢?
+  // rotate --> rotate_interval_
   if (conf->rotate == "daily") {
     rotate_interval_ = 3600 * 24;
   } else if (conf->rotate == "hourly") {
@@ -25,6 +30,8 @@ FileStore::FileStore(StoreConfig *conf, struct Statistic* stat) : Store(conf), s
   }
 
   // no need to flush fwrite for secondary store
+  // 2.
+  // 正常情况下没有设置Flush
   if (buffer_type_ == kSecondary || !ParseTime(conf->flush.c_str(), &flush_interval_)) {
     flush_interval_ = -1;
   }
@@ -39,6 +46,7 @@ FileStore::~FileStore() {
 
 bool FileStore::Open() {
   if (is_open_) Close();
+
   is_open_ = true;
   LogDebug("openning FileStore...");
   if (buffer_type_ == kSecondary) {
@@ -97,6 +105,9 @@ void FileStore::Close() {
 
 bool FileStore::DoAddMessage(const Message *msg) {
   bool success = false;
+
+  // 如何添加Message呢?
+  // 如果是缓存？
   if (buffer_type_ == kSecondary && secondary_file_ != NULL) {
     // secondary file store, write size and whole topic and msg
     // 将消息序列化到本地磁盘(topic, content)
@@ -118,7 +129,10 @@ bool FileStore::DoAddMessage(const Message *msg) {
         // 例如: 按照天来处理，如何办?
       time_t t = unixtime;
       if (rotate_interval_ > 0) t -= t % rotate_interval_;
+
+      // 打开新的文件:
       File *file = File::Open(path_, name_, false, msg->topic, t);
+
       if (file == NULL) {
         LogError("%s path: %s name: %s topic: %s", ERR_CREATE_FILE, path_.c_str(), name_.c_str(), msg->topic);
         success = false;
@@ -147,10 +161,14 @@ bool FileStore::DoAddMessage(const Message *msg) {
 void FileStore::Cron() {
   if (!is_open_) return;
   time_t t = unixtime;
+  // 刚好在: rotate_interval_ 整数倍上?
   if (rotate_interval_ != -1 && t % rotate_interval_ == 0 && last_rotate_ < t) {
     LogDebug("rotate %d %d %d", t, last_rotate_, rotate_interval_);
     Open();
   } else if (flush_interval_ != -1 && t - last_flush_ >= flush_interval_) {
+
+    // 其他情况?
+    // 超过了 flush_interval
     LogDebug("flush %d %d %d", t, flush_interval_, flush_interval_);
     if (Flush()) {
       LogDebug("successfully flushed all topic");

@@ -30,8 +30,11 @@ class BufferStore : public Store {
   virtual bool DoAddMessage(const Message *msg);
 
   struct Statistic *stat_;
+
+  // 存在两个Store
   Store *primary_;
   Store *secondary_;
+
   Status state_;
   std::deque<const Message*> *msg_to_transfer_;
   bool is_open_;

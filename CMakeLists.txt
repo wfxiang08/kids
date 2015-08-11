@@ -1,0 +1,52 @@
+cmake_minimum_required(VERSION 3.2)
+project(kids)
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+
+set(SOURCE_FILES src/buffer.cc
+                 src/buffer.h
+                 src/client.cc
+                 src/client.h
+                 src/common.h
+                 src/conf.cc
+                 src/conf.h
+                 src/constants.h
+                 src/filesystem.cc
+                 src/filesystem.h
+                 src/kids.cc
+                 src/kids.h
+                 src/lexer.c
+                 src/lexer.rl
+                 src/logger.cc
+                 src/logger.h
+                 src/Makefile.am
+                 src/master.cc
+                 src/master.h
+                 src/msgqueue.cc
+                 src/msgqueue.h
+                 src/parser.c
+                 src/parser.h
+                 src/parser.y
+                 src/pubsub.cc
+                 src/sds.c
+                 src/sds.h
+                 src/store
+                 src/store/bufferstore.cc
+                 src/store/bufferstore.h
+                 src/store/filestore.cc
+                 src/store/filestore.h
+                 src/store/multiplestore.cc
+                 src/store/multiplestore.h
+                 src/store/networkstore.cc
+                 src/store/networkstore.h
+                 src/store/prioritystore.cc
+                 src/store/prioritystore.h
+                 src/store/store.cc
+                 src/store/store.h
+                 src/storer.cc
+                 src/storer.h
+                 src/util.cc
+                 src/util.h
+                 src/worker.cc
+                 src/worker.h)
+add_executable(kids ${SOURCE_FILES})

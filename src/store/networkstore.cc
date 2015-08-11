@@ -3,6 +3,9 @@
 void SendRequest(aeEventLoop *el, int fd, void *privdata, int mask);
 void ReadReply(aeEventLoop *el, int fd, void *privdata, int mask);
 
+//
+// 定义了class的内部类
+//
 class NetworkStore::Agent {
   friend void SendRequest(aeEventLoop *el, int fd, void *privdata, int mask);
   friend void ReadReply(aeEventLoop *el, int fd, void *privdata, int mask);
@@ -41,6 +44,7 @@ NetworkStore::Agent *NetworkStore::Agent::Create(const int fd, NetworkStore *sto
   Agent *s = new Agent();
   s->eventl_ = store->eventl_;
 
+  // NonBlock & No Delay
   anetNonBlock(NULL, fd);
   anetEnableTcpNoDelay(NULL, fd);
   s->fd_ = fd;
@@ -81,7 +85,7 @@ void NetworkStore::Agent::Log(const Message *msg) {
   }
 
   LogDebug("log to remote server, req buflen: %d, data: %s:%s", req_.size(), msg->topic, msg->content);
-
+  // 通过REDIS协议将数据写入到req_中
   req_.append_printf("*3\r\n$3\r\nLOG\r\n$%d\r\n", sdslen(msg->topic));
   req_.append(msg->topic, sdslen(msg->topic));
   req_.append("\r\n", 2);
@@ -160,6 +164,8 @@ NetworkStore::NetworkStore(StoreConfig *conf, aeEventLoop *el) :Store(conf), eve
   agent_ = NULL;
   reconnect_interval_ = 5;
   last_reconnect_ = 0;
+
+  // 采用什么样的协议通信呢?
   if (!conf->socket.empty()) {
     socket_ = conf->socket;
   } else if (!conf->host.empty() && !conf->port.empty()) {
@@ -219,6 +225,12 @@ void NetworkStore::Close() {
 bool NetworkStore::DoAddMessage(const Message *msg) {
   if (!IsOpen()) return false;
   LogDebug("add message %p", msg);
+
+  // 网络状态如何"智能"维持呢?
+  // 如何判断Server是否挂了?
+  // 如何Server正常，如何保持连接健康
+  // 连接异常如何检测呢?
+  //
   agent_->Log(msg);
   state_ = Store::Sending;
   return true;
@@ -235,6 +247,7 @@ void NetworkStore::OnDisconnect() {
 void NetworkStore::Cron() {
   if (IsOpen()) return;
   time_t t = unixtime;
+  // 没有打开的情况下，重试着打开
   if (t - last_reconnect_ >= reconnect_interval_) {
     LogDebug("reconnect %d %d %d", t, last_reconnect_, reconnect_interval_);
     Open();
@@ -269,6 +282,8 @@ void SendRequest(aeEventLoop *el, int fd, void *privdata, int mask) {
     if (totwritten > KIDS_MAX_WRITE_PER_EVENT) break;
   }
 
+  // 什么情况是网络出现问题呢?
+  // 数据写不出去，并且errorno
   if (nwritten == -1) {
     if (errno != EAGAIN) {
       LogError("error writing to client: %s", strerror(errno));
@@ -277,6 +292,7 @@ void SendRequest(aeEventLoop *el, int fd, void *privdata, int mask) {
     }
   }
 
+  // 处理完毕了?
   if (s->sentlen_ == s->req_.size()) {
     aeDeleteFileEvent(el, fd, AE_WRITABLE);
   }
