@@ -1,4 +1,4 @@
-FROM debian:wheezy
+FROM 10.9.49.222:5000/chunyu_base:v5
 
 MAINTAINER Li Yichao <liyichao.good@gmail.com>
 
@@ -16,5 +16,7 @@ RUN ./autogen.sh && ./configure && make
 
 EXPOSE :3388
 
-CMD ["src/kids", "-c", "/kids/debian/kids.conf"]
+CMD ["src/kids", "-c", "/kids/kids.conf"]
+
+PUSH  10.9.49.222:5000/kids:v1
 
