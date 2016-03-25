@@ -3,7 +3,22 @@ project(kids)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
-set(SOURCE_FILES src/buffer.cc
+include_directories(deps/ae/)
+set(SOURCE_FILES 
+                deps/ae/ae.c
+                deps/ae/ae.h
+                deps/ae/ae_epoll.c
+                deps/ae/ae_evport.c
+                deps/ae/ae_kqueue.c
+                deps/ae/ae_select.c
+                deps/ae/anet.c
+                deps/ae/anet.h
+                deps/ae/config.h
+                deps/ae/fmacros.h
+                deps/ae/libae.h
+                deps/ae/zmalloc.c
+                deps/ae/zmalloc.h
+                src/buffer.cc   
                  src/buffer.h
                  src/client.cc
                  src/client.h

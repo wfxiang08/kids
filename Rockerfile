@@ -1,0 +1,15 @@
+FROM 10.9.49.222:5000/chunyu_base:v5
+RUN	yum install -y build-essential libtool automake
+
+WORKDIR /kids
+
+COPY . /kids
+RUN ./autogen.sh && ./configure && make
+
+FROM 10.9.49.222:5000/chunyu_base:v5
+WORKDIR /kids
+ADD /kids/src/kids /bin/kids
+EXPOSE :3388
+
+PUSH  10.9.49.222:5000/kids:v1
+
